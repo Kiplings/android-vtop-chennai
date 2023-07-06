@@ -162,4 +162,5 @@
     <string name="dnd_off">Off</string>
     <string name="dnd_vibrate">Vibrate</string>
     <string name="dnd_silent">Silent</string>
+    <string name="timetable_widget_description">This widget show you today\'s timetable.</string>
 </resources>
