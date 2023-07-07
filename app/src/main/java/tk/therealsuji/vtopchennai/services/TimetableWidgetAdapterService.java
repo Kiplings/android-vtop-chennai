@@ -17,7 +17,9 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 import tk.therealsuji.vtopchennai.R;
 import tk.therealsuji.vtopchennai.helpers.AppDatabase;
 import tk.therealsuji.vtopchennai.helpers.SettingsRepository;
+import tk.therealsuji.vtopchennai.interfaces.CoursesDao;
 import tk.therealsuji.vtopchennai.interfaces.TimetableDao;
+import tk.therealsuji.vtopchennai.models.Course;
 import tk.therealsuji.vtopchennai.models.Timetable;
 
 public class TimetableWidgetAdapterService extends RemoteViewsService{
@@ -29,15 +31,19 @@ public class TimetableWidgetAdapterService extends RemoteViewsService{
 
     class RemoteViewsFactory implements RemoteViewsService.RemoteViewsFactory {
         private final Context context;
-        AppDatabase appDatabase;
-        TimetableDao timetableDao;
+        private AppDatabase appDatabase;
+        private TimetableDao timetableDao;
+        private CoursesDao coursesDao;
         private List<Timetable.AllData> timetable;
+        private List<String> venue;
 
         public RemoteViewsFactory(Context context) {
             this.context = context;
             appDatabase = AppDatabase.getInstance(context);
             timetableDao = appDatabase.timetableDao();
+            coursesDao = appDatabase.coursesDao();
             timetable = new ArrayList<>();
+            venue=new ArrayList<>();
         }
 
         @Override
@@ -69,6 +75,7 @@ public class TimetableWidgetAdapterService extends RemoteViewsService{
                                 return;
                             }
                             timetable=todaysTimetable;
+                            updateVenue();
                         }
 
                         @Override
@@ -76,6 +83,32 @@ public class TimetableWidgetAdapterService extends RemoteViewsService{
 
                         }
                     });
+        }
+
+        void updateVenue(){
+            for (Timetable.AllData allData : timetable){
+                coursesDao
+                        .getCourse(allData.slotId)
+                        .subscribeOn(Schedulers.single())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(new SingleObserver<Course.AllData>() {
+                            @Override
+                            public void onSubscribe(@io.reactivex.rxjava3.annotations.NonNull Disposable d) {
+
+                            }
+
+                            @Override
+                            public void onSuccess(@io.reactivex.rxjava3.annotations.NonNull Course.AllData course) {
+                                venue.add(course.venue);
+                            }
+
+                            @Override
+                            public void onError(@io.reactivex.rxjava3.annotations.NonNull Throwable e) {
+
+                            }
+                        });
+            }
+
         }
 
         @Override
@@ -93,7 +126,7 @@ public class TimetableWidgetAdapterService extends RemoteViewsService{
             Timetable.AllData data=timetable.get(position);
             RemoteViews remoteView = new RemoteViews(context.getPackageName(), R.layout.widget_timetable_item);
 
-            remoteView.setTextViewText(R.id.text_view_course_code, data.courseCode);
+            remoteView.setTextViewText(R.id.widget_text_view_course_code, data.courseCode);
             String timing;
             try {
                 timing = SettingsRepository.getSystemFormattedTime(this.context, data.startTime) +
@@ -101,15 +134,15 @@ public class TimetableWidgetAdapterService extends RemoteViewsService{
             } catch (ParseException e) {
                 throw new RuntimeException(e);
             }
-            remoteView.setTextViewText(R.id.text_view_timings, timing);
-            //change for this
-            remoteView.setTextViewText(R.id.text_view_venue, "Venue TBD");//data.venue);
+            remoteView.setTextViewText(R.id.widget_text_view_timings, timing);
+            remoteView.setTextViewText(R.id.widget_text_view_venue, venue.get(position));
 
+            remoteView.setOnClickFillInIntent(R.id.widget_container, new Intent());
 
             if (data.courseType.equals("theory")) {
-                remoteView.setImageViewResource(R.id.image_view_course_type,R.drawable.ic_theory);
+                remoteView.setImageViewResource(R.id.widget_image_view_course_type,R.drawable.ic_theory);
             }
-            // Log.w("Widget",data.courseCode+"\n"+data.startTime+"\n"+data.endTime+"\n"+timing);
+
             return remoteView;
         }
 
